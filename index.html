@@ -1,0 +1,1628 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Monitoreo de Riesgos Informáticos</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #fff;
+            overflow-x: hidden;
+        }
+
+        .header {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: gradient 3s ease-in-out infinite alternate;
+        }
+
+        @keyframes gradient {
+            0% { filter: hue-rotate(0deg); }
+            100% { filter: hue-rotate(180deg); }
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+            border: none;
+            border-radius: 25px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn:hover::before {
+            left: 100%;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255, 107, 107, 0.4);
+        }
+
+        .btn.active {
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+            box-shadow: 0 4px 15px rgba(78, 205, 196, 0.3);
+        }
+
+        .btn.report-btn {
+            background: linear-gradient(45deg, #9b59b6, #8e44ad);
+            box-shadow: 0 4px 15px rgba(155, 89, 182, 0.3);
+        }
+
+        .btn.security-btn {
+            background: linear-gradient(45deg, #e67e22, #d35400);
+            box-shadow: 0 4px 15px rgba(230, 126, 34, 0.3);
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            padding: 30px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .dashboard.report-mode {
+            grid-template-columns: 1fr;
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 25px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease;
+        }
+
+        .panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4);
+            background-size: 200% 100%;
+            animation: borderSlide 3s linear infinite;
+        }
+
+        @keyframes borderSlide {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .panel:hover {
+            transform: translateY(-5px);
+        }
+
+        .panel h2 {
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            text-align: center;
+            color: #fff;
+        }
+
+        .risk-matrix {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            margin: 20px 0;
+        }
+
+        .risk-cell {
+            aspect-ratio: 1;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 12px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .risk-cell::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .risk-cell:hover::before {
+            opacity: 1;
+        }
+
+        .risk-cell:hover {
+            transform: scale(1.1);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .heatmap {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 4px;
+            margin: 20px 0;
+        }
+
+        .heat-cell {
+            aspect-ratio: 1;
+            border-radius: 4px;
+            transition: all 0.4s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .heat-cell::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: all 0.3s ease;
+        }
+
+        .heat-cell:hover::after {
+            width: 100%;
+            height: 100%;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .stat-card {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transform: translateX(-100%);
+            transition: transform 0.6s ease;
+        }
+
+        .stat-card:hover::before {
+            transform: translateX(100%);
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 5px;
+            transition: all 0.3s ease;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
+        .legend {
+            display: flex;
+            justify-content: space-between;
+            margin: 15px 0;
+            font-size: 12px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .legend-color {
+            width: 15px;
+            height: 15px;
+            border-radius: 3px;
+        }
+
+        .status-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #4ecdc4;
+            display: inline-block;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        .alert-panel {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            max-width: 400px;
+            background: rgba(255, 107, 107, 0.9);
+            padding: 15px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+
+        .alert-panel.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .report-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            padding: 20px;
+        }
+
+        .report-modal.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .report-content {
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 1200px;
+            max-height: 90vh;
+            width: 100%;
+            overflow-y: auto;
+            position: relative;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+        }
+
+        .report-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .report-header h2 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .report-timestamp {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 1.1em;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .close-btn:hover {
+            background: rgba(255, 107, 107, 0.8);
+            transform: rotate(90deg);
+        }
+
+        .report-section {
+            margin-bottom: 40px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 25px;
+            border-radius: 15px;
+            border-left: 4px solid #4ecdc4;
+        }
+
+        .report-section h3 {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            color: #4ecdc4;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin: 20px 0;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 15px;
+        }
+
+        .report-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .security-events {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            padding: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .event-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            margin: 5px 0;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            border-left: 4px solid;
+        }
+
+        .event-item.critical {
+            border-left-color: #e74c3c;
+        }
+
+        .event-item.warning {
+            border-left-color: #f39c12;
+        }
+
+        .event-item.info {
+            border-left-color: #3498db;
+        }
+
+        .network-topology {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .network-node {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .network-node::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1);
+            border-radius: 12px;
+            z-index: -1;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .network-node:hover::before {
+            opacity: 1;
+        }
+
+        .network-node.compromised {
+            background: rgba(231, 76, 60, 0.3);
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.5; }
+        }
+
+        .threat-timeline {
+            position: relative;
+            padding: 20px 0;
+        }
+
+        .timeline-item {
+            display: flex;
+            align-items: center;
+            margin: 15px 0;
+            position: relative;
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            width: 2px;
+            height: 100%;
+            background: #4ecdc4;
+            transform: translateY(-50%);
+        }
+
+        .timeline-dot {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: #4ecdc4;
+            margin-right: 20px;
+            z-index: 1;
+            position: relative;
+        }
+
+        .timeline-content {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px 15px;
+            border-radius: 8px;
+            flex: 1;
+        }
+
+        .vulnerability-scanner {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .vuln-category {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .vuln-category::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, #e74c3c, #f39c12, #2ecc71);
+        }
+
+        .progress-bar {
+            background: rgba(255, 255, 255, 0.2);
+            height: 8px;
+            border-radius: 4px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4ecdc4, #45b7d1);
+            border-radius: 4px;
+            transition: width 1s ease;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+                padding: 15px;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .report-content {
+                padding: 20px;
+                margin: 10px;
+            }
+
+            .report-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top: 3px solid #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .loading.show {
+            opacity: 1;
+        }
+
+        @keyframes spin {
+            0% { transform: translate(-50%, -50%) rotate(0deg); }
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+
+        .mini-chart {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🛡️ Sistema de Monitoreo de Riesgos Informáticos</h1>
+        <div class="controls">
+            <button class="btn active" id="autoBtn">🔄 Actualización Automática</button>
+            <button class="btn" id="manualBtn">👆 Actualizar Manual</button>
+            <button class="btn security-btn" id="scanBtn">🔍 Escaneo de Vulnerabilidades</button>
+            <button class="btn" id="alertBtn">🚨 Generar Alerta</button>
+            <button class="btn report-btn" id="reportBtn">📊 Generar Reporte Completo</button>
+            <button class="btn" id="exportBtn">💾 Exportar Datos</button>
+        </div>
+    </div>
+
+    <div class="status-indicator">
+        <span class="status-dot"></span>
+        <span id="statusText">Monitoreo Activo</span>
+    </div>
+
+    <div class="dashboard" id="dashboard">
+        <div class="panel">
+            <h2>🗺️ Mapa de Riesgos</h2>
+            <div class="loading" id="riskLoading"></div>
+            <div class="risk-matrix" id="riskMatrix"></div>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #2ecc71;"></div>
+                    <span>Bajo (1-2)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #f39c12;"></div>
+                    <span>Medio (3-4)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #e74c3c;"></div>
+                    <span>Alto (5)</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>🔥 Mapa de Calor</h2>
+            <div class="loading" id="heatLoading"></div>
+            <div class="heatmap" id="heatmap"></div>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #3498db;"></div>
+                    <span>Frío (0-30%)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #f39c12;"></div>
+                    <span>Cálido (31-70%)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #e74c3c;"></div>
+                    <span>Caliente (71-100%)</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>📈 Estadísticas de Riesgos</h2>
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalThreats">0</div>
+                    <div class="stat-label">Amenazas Totales</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="criticalRisks">0</div>
+                    <div class="stat-label">Riesgos Críticos</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="vulnerabilities">0</div>
+                    <div class="stat-label">Vulnerabilidades</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="incidents">0</div>
+                    <div class="stat-label">Incidentes</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>⚡ Actividad en Tiempo Real</h2>
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="systemLoad">0%</div>
+                    <div class="stat-label">Carga del Sistema</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="networkTraffic">0</div>
+                    <div class="stat-label">Tráfico de Red</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="securityScore">0</div>
+                    <div class="stat-label">Puntuación de Seguridad</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="uptime">0h</div>
+                    <div class="stat-label">Tiempo Activo</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>🌐 Topología de Red</h2>
+            <div class="network-topology" id="networkTopology">
+                <!-- Generado dinámicamente -->
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>🔍 Eventos de Seguridad</h2>
+            <div class="security-events" id="securityEvents">
+                <!-- Generado dinámicamente -->
+            </div>
+        </div>
+    </div>
+
+    <div class="alert-panel" id="alertPanel">
+        <strong>🚨 Alerta de Seguridad</strong>
+        <p id="alertMessage"></p>
+    </div>
+
+    <!-- Modal de Reporte -->
+    <div class="report-modal" id="reportModal">
+        <div class="report-content">
+            <button class="close-btn" id="closeReport">×</button>
+            <div class="report-header">
+                <h2>📊 Reporte Completo de Seguridad</h2>
+                <div class="report-timestamp" id="reportTimestamp"></div>
+            </div>
+            
+            <div class="report-section">
+                <h3>📈 Análisis de Tendencias</h3>
+                <div class="chart-container">
+                    <canvas id="trendsChart"></canvas>
+                </div>
+            </div>
+
+            <div class="report-section">
+                <h3>🎯 Distribución de Riesgos</h3>
+                <div class="report-grid">
+                    <div class="chart-container">
+                        <canvas id="riskDistChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="threatTypesChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="report-section">
+                <h3>🌐 Estado de la Red</h3>
+                <div class="chart-container">
+                    <canvas id="networkChart"></canvas>
+                </div>
+            </div>
+
+            <div class="report-section">
+                <h3>🔍 Análisis de Vulnerabilidades</h3>
+                <div class="vulnerability-scanner" id="vulnScanner">
+                    <!-- Generado dinámicamente -->
+                </div>
+            </div>
+
+            <div class="report-section">
+                <h3>⏱️ Línea de Tiempo de Amenazas</h3>
+                <div class="threat-timeline" id="threatTimeline">
+                    <!-- Generado dinámicamente -->
+                </div>
+            </div>
+
+            <div class="report-section">
+                <h3>📋 Resumen Ejecutivo</h3>
+                <div id="executiveSummary">
+                    <!-- Generado dinámicamente -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class AdvancedRiskMonitoringSystem {
+            constructor() {
+                this.autoUpdate = true;
+                this.updateInterval = null;
+                this.riskData = [];
+                this.heatData = [];
+                this.networkNodes = [];
+                this.securityEvents = [];
+                this.uptime = 0;
+                this.charts = {};
+                this.historicalData = {
+                    threats: [],
+                    risks: [],
+                    vulnerabilities: [],
+                    incidents: []
+                };
+                
+                this.initializeSystem();
+                this.bindEvents();
+                this.startAutoUpdate();
+                this.startUptimeCounter();
+                this.generateNetworkTopology();
+                this.generateSecurityEvents();
+                this.collectHistoricalData();
+            }
+
+            initializeSystem() {
+                this.generateRiskMatrix();
+                this.generateHeatmap();
+                this.updateStats();
+            }
+
+            bindEvents() {
+                document.getElementById('autoBtn').addEventListener('click', () => {
+                    this.toggleAutoUpdate();
+                });
+
+                document.getElementById('manualBtn').addEventListener('click', () => {
+                    this.manualUpdate();
+                });
+
+                document.getElementById('scanBtn').addEventListener('click', () => {
+                    this.performVulnerabilityScan();
+                });
+
+                document.getElementById('alertBtn').addEventListener('click', () => {
+                    this.generateAlert();
+                });
+
+                document.getElementById('reportBtn').addEventListener('click', () => {
+                    this.generateComprehensiveReport();
+                });
+
+                document.getElementById('exportBtn').addEventListener('click', () => {
+                    this.exportData();
+                });
+
+                document.getElementById('closeReport').addEventListener('click', () => {
+                    this.closeReport();
+                });
+            }
+
+            startAutoUpdate() {
+                if (this.autoUpdate) {
+                    this.updateInterval = setInterval(() => {
+                        this.updateData();
+                        this.updateSecurityEvents();
+                        this.updateNetworkStatus();
+                        this.collectHistoricalData();
+                    }, 5000);
+                }
+            }
+
+            startUptimeCounter() {
+                setInterval(() => {
+                    this.uptime++;
+                    document.getElementById('uptime').textContent = `${this.uptime}h`;
+                }, 3600000);
+            }
+
+            collectHistoricalData() {
+                const now = new Date();
+                this.historicalData.threats.push({
+                    time: now,
+                    value: Math.floor(Math.random() * 1000) + 50
+                });
+                this.historicalData.risks.push({
+                    time: now,
+                    value: Math.floor(Math.random() * 25) + 1
+                });
+                this.historicalData.vulnerabilities.push({
+                    time: now,
+                    value: Math.floor(Math.random() * 150) + 10
+                });
+                this.historicalData.incidents.push({
+                    time: now,
+                    value: Math.floor(Math.random() * 10)
+                });
+
+                // Mantener solo los últimos 20 puntos de datos
+                Object.keys(this.historicalData).forEach(key => {
+                    if (this.historicalData[key].length > 20) {
+                        this.historicalData[key] = this.historicalData[key].slice(-20);
+                    }
+                });
+            }
+
+            toggleAutoUpdate() {
+                this.autoUpdate = !this.autoUpdate;
+                const btn = document.getElementById('autoBtn');
+                
+                if (this.autoUpdate) {
+                    btn.classList.add('active');
+                    btn.innerHTML = '🔄 Actualización Automática';
+                    document.getElementById('statusText').textContent = 'Monitoreo Activo';
+                    this.startAutoUpdate();
+                } else {
+                    btn.classList.remove('active');
+                    btn.innerHTML = '⏸️ Pausado';
+                    document.getElementById('statusText').textContent = 'Monitoreo Pausado';
+                    clearInterval(this.updateInterval);
+                }
+            }
+
+            manualUpdate() {
+                this.showLoading();
+                setTimeout(() => {
+                    this.updateData();
+                    this.updateSecurityEvents();
+                    this.updateNetworkStatus();
+                    this.hideLoading();
+                }, 1000);
+            }
+
+            showLoading() {
+                document.getElementById('riskLoading').classList.add('show');
+                document.getElementById('heatLoading').classList.add('show');
+            }
+
+            hideLoading() {
+                document.getElementById('riskLoading').classList.remove('show');
+                document.getElementById('heatLoading').classList.remove('show');
+            }
+
+            updateData() {
+                this.generateRiskMatrix();
+                this.generateHeatmap();
+                this.updateStats();
+                this.animateUpdate();
+            }
+
+            generateRiskMatrix() {
+                const matrix = document.getElementById('riskMatrix');
+                matrix.innerHTML = '';
+                this.riskData = [];
+
+                const riskTypes = [
+                    'Malware', 'Phishing', 'DDoS', 'Inyección SQL', 'XSS',
+                    'Ransomware', 'Filtración de Datos', 'Amenaza Interna', 'Día Cero', 'Ataque MITM',
+                    'Fuerza Bruta', 'Ingeniería Social', 'Puerta Trasera', 'Troyano', 'Spyware',
+                    'Rootkit', 'Botnet', 'APT', 'Criptominería', 'Ataque IoT',
+                    'Cadena Suministro', 'Vuln. en la Nube', 'Amenaza Móvil', 'Ataque IA', 'Riesgo Cuántico'
+                ];
+
+                for (let i = 0; i < 25; i++) {
+                    const riskLevel = Math.floor(Math.random() * 5) + 1;
+                    const cell = document.createElement('div');
+                    cell.className = 'risk-cell';
+                    cell.textContent = riskLevel;
+                    cell.title = `${riskTypes[i]}: Nivel ${riskLevel}`;
+                    
+                    if (riskLevel <= 2) {
+                        cell.style.background = 'linear-gradient(45deg, #2ecc71, #27ae60)';
+                    } else if (riskLevel <= 4) {
+                        cell.style.background = 'linear-gradient(45deg, #f39c12, #e67e22)';
+                    } else {
+                        cell.style.background = 'linear-gradient(45deg, #e74c3c, #c0392b)';
+                    }
+
+                    cell.addEventListener('click', () => {
+                        this.showRiskDetails(riskTypes[i], riskLevel);
+                    });
+
+                    matrix.appendChild(cell);
+                    this.riskData.push({ type: riskTypes[i], level: riskLevel });
+                }
+            }
+
+            generateHeatmap() {
+                const heatmap = document.getElementById('heatmap');
+                heatmap.innerHTML = '';
+                this.heatData = [];
+
+                for (let i = 0; i < 64; i++) {
+                    const intensity = Math.random() * 100;
+                    const cell = document.createElement('div');
+                    cell.className = 'heat-cell';
+                    
+                    let color;
+                    if (intensity < 30) {
+                        color = `rgba(52, 152, 219, ${intensity / 100})`;
+                    } else if (intensity < 70) {
+                        color = `rgba(243, 156, 18, ${intensity / 100})`;
+                    } else {
+                        color = `rgba(231, 76, 60, ${intensity / 100})`;
+                    }
+                    
+                    cell.style.background = color;
+                    cell.title = `Intensidad: ${intensity.toFixed(1)}%`;
+                    
+                    heatmap.appendChild(cell);
+                    this.heatData.push(intensity);
+                }
+            }
+
+            generateNetworkTopology() {
+                const topology = document.getElementById('networkTopology');
+                const nodeTypes = [
+                    { name: 'Servidor Principal', icon: '🖥️', risk: 'bajo' },
+                    { name: 'Cortafuegos', icon: '🛡️', risk: 'medio' },
+                    { name: 'Enrutador', icon: '📡', risk: 'bajo' },
+                    { name: 'Base de Datos', icon: '💾', risk: 'alto' },
+                    { name: 'DMZ', icon: '🌐', risk: 'medio' },
+                    { name: 'Puerta VPN', icon: '🔒', risk: 'bajo' },
+                    { name: 'Balanceador', icon: '⚖️', risk: 'medio' },
+                    { name: 'Punto Final', icon: '💻', risk: 'alto' }
+                ];
+
+                nodeTypes.forEach(node => {
+                    const nodeElement = document.createElement('div');
+                    nodeElement.className = `network-node ${Math.random() < 0.1 ? 'compromised' : ''}`;
+                    nodeElement.innerHTML = `
+                        <div style="font-size: 2em; margin-bottom: 10px;">${node.icon}</div>
+                        <div style="font-size: 0.9em;">${node.name}</div>
+                        <div style="font-size: 0.8em; opacity: 0.8;">${node.risk.toUpperCase()}</div>
+                    `;
+                    topology.appendChild(nodeElement);
+                    this.networkNodes.push(node);
+                });
+            }
+
+            generateSecurityEvents() {
+                const events = document.getElementById('securityEvents');
+                const eventTypes = [
+                    { type: 'critical', icon: '🔥', message: 'Intento de acceso no autorizado detectado' },
+                    { type: 'warning', icon: '⚠️', message: 'Tráfico sospechoso identificado' },
+                    { type: 'info', icon: 'ℹ️', message: 'Actualización de sistema completada' },
+                    { type: 'critical', icon: '🚨', message: 'Malware bloqueado en punto final' },
+                    { type: 'warning', icon: '⚡', message: 'Pico de tráfico anómalo detectado' },
+                    { type: 'info', icon: '✅', message: 'Respaldo automático realizado exitosamente' }
+                ];
+
+                eventTypes.forEach(event => {
+                    const eventElement = document.createElement('div');
+                    eventElement.className = `event-item ${event.type}`;
+                    eventElement.innerHTML = `
+                        <span>${event.icon} ${event.message}</span>
+                        <small>${new Date().toLocaleTimeString()}</small>
+                    `;
+                    events.appendChild(eventElement);
+                });
+            }
+
+            updateSecurityEvents() {
+                const events = document.getElementById('securityEvents');
+                const newEventTypes = [
+                    { type: 'critical', icon: '🔥', message: 'Actividad de botnet detectada en la red' },
+                    { type: 'warning', icon: '⚠️', message: 'Escaneo de puertos identificado desde IP externa' },
+                    { type: 'info', icon: 'ℹ️', message: 'Política de seguridad actualizada correctamente' },
+                    { type: 'critical', icon: '🚨', message: 'Intento de escalada de privilegios bloqueado' }
+                ];
+
+                if (Math.random() < 0.3) {
+                    const randomEvent = newEventTypes[Math.floor(Math.random() * newEventTypes.length)];
+                    const eventElement = document.createElement('div');
+                    eventElement.className = `event-item ${randomEvent.type}`;
+                    eventElement.innerHTML = `
+                        <span>${randomEvent.icon} ${randomEvent.message}</span>
+                        <small>${new Date().toLocaleTimeString()}</small>
+                    `;
+                    events.insertBefore(eventElement, events.firstChild);
+                    
+                    // Mantener solo los últimos 10 eventos
+                    while (events.children.length > 10) {
+                        events.removeChild(events.lastChild);
+                    }
+                }
+            }
+
+            updateNetworkStatus() {
+                const nodes = document.querySelectorAll('.network-node');
+                nodes.forEach(node => {
+                    if (Math.random() < 0.05) {
+                        node.classList.toggle('compromised');
+                    }
+                });
+            }
+
+            performVulnerabilityScan() {
+                this.showAlert('🔍 Iniciando escaneo completo de vulnerabilidades del sistema...');
+                
+                setTimeout(() => {
+                    const vulnerabilities = Math.floor(Math.random() * 50) + 10;
+                    const critical = Math.floor(vulnerabilities * 0.1);
+                    const high = Math.floor(vulnerabilities * 0.2);
+                    const medium = Math.floor(vulnerabilities * 0.4);
+                    const low = vulnerabilities - critical - high - medium;
+                    
+                    this.showAlert(`✅ Escaneo completado: ${vulnerabilities} vulnerabilidades encontradas (${critical} críticas, ${high} altas, ${medium} medias, ${low} bajas)`);
+                }, 3000);
+            }
+
+            updateStats() {
+                const totalThreats = Math.floor(Math.random() * 1000) + 50;
+                const criticalRisks = Math.floor(Math.random() * 25) + 1;
+                const vulnerabilities = Math.floor(Math.random() * 150) + 10;
+                const incidents = Math.floor(Math.random() * 10);
+                const systemLoad = Math.floor(Math.random() * 100);
+                const networkTraffic = Math.floor(Math.random() * 1000) + 100;
+                const securityScore = Math.floor(Math.random() * 40) + 60;
+
+                this.animateValue('totalThreats', totalThreats);
+                this.animateValue('criticalRisks', criticalRisks);
+                this.animateValue('vulnerabilities', vulnerabilities);
+                this.animateValue('incidents', incidents);
+                this.animateValue('systemLoad', systemLoad, '%');
+                this.animateValue('networkTraffic', networkTraffic);
+                this.animateValue('securityScore', securityScore);
+            }
+
+            animateValue(elementId, targetValue, suffix = '') {
+                const element = document.getElementById(elementId);
+                const startValue = parseInt(element.textContent) || 0;
+                const increment = (targetValue - startValue) / 20;
+                let currentValue = startValue;
+
+                const timer = setInterval(() => {
+                    currentValue += increment;
+                    if ((increment > 0 && currentValue >= targetValue) || 
+                        (increment < 0 && currentValue <= targetValue)) {
+                        currentValue = targetValue;
+                        clearInterval(timer);
+                    }
+                    element.textContent = Math.floor(currentValue) + suffix;
+                }, 50);
+            }
+
+            animateUpdate() {
+                const panels = document.querySelectorAll('.panel');
+                panels.forEach((panel, index) => {
+                    setTimeout(() => {
+                        panel.style.transform = 'scale(1.02)';
+                        setTimeout(() => {
+                            panel.style.transform = 'scale(1)';
+                        }, 200);
+                    }, index * 100);
+                });
+            }
+
+            showRiskDetails(riskType, level) {
+                const descriptions = {
+                    1: "Riesgo muy bajo - Monitoreo rutinario",
+                    2: "Riesgo bajo - Vigilancia ocasional",
+                    3: "Riesgo medio - Atención requerida",
+                    4: "Riesgo alto - Acción inmediata",
+                    5: "Riesgo crítico - Respuesta de emergencia"
+                };
+
+                this.showAlert(`${riskType}: ${descriptions[level]}`);
+            }
+
+            generateAlert() {
+                const alertMessages = [
+                    "Detección de actividad sospechosa en el sector de red DMZ",
+                    "Múltiples intentos de acceso fallidos detectados en el sistema",
+                    "Anomalía en el tráfico de datos identificada en el servidor principal",
+                    "Posible intento de intrusión detectado en el servidor principal",
+                    "Actualización de seguridad crítica disponible para instalación",
+                    "Configuración de cortafuegos modificada sin autorización previa",
+                    "Detección de comunicación con servidor de comando y control",
+                    "Archivo malicioso detectado y puesto en cuarentena automáticamente",
+                    "Elevación de privilegios no autorizada detectada en el sistema",
+                    "Conexión VPN sospechosa detectada desde dirección IP desconocida"
+                ];
+
+                const randomMessage = alertMessages[Math.floor(Math.random() * alertMessages.length)];
+                this.showAlert(randomMessage);
+            }
+
+            showAlert(message) {
+                const alertPanel = document.getElementById('alertPanel');
+                const alertMessage = document.getElementById('alertMessage');
+                
+                alertMessage.textContent = message;
+                alertPanel.classList.add('show');
+                
+                setTimeout(() => {
+                    alertPanel.classList.remove('show');
+                }, 5000);
+            }
+
+            generateComprehensiveReport() {
+                const modal = document.getElementById('reportModal');
+                const timestamp = document.getElementById('reportTimestamp');
+                
+                timestamp.textContent = `Generado el ${new Date().toLocaleString('es-ES')}`;
+                modal.classList.add('show');
+                
+                // Generar todos los gráficos
+                this.createTrendsChart();
+                this.createRiskDistributionChart();
+                this.createThreatTypesChart();
+                this.createNetworkChart();
+                this.generateVulnerabilityAnalysis();
+                this.generateThreatTimeline();
+                this.generateExecutiveSummary();
+            }
+
+            createTrendsChart() {
+                const ctx = document.getElementById('trendsChart');
+                if (this.charts.trends) {
+                    this.charts.trends.destroy();
+                }
+
+                this.charts.trends = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: this.historicalData.threats.map(d => d.time.toLocaleTimeString()),
+                        datasets: [{
+                            label: 'Amenazas Detectadas',
+                            data: this.historicalData.threats.map(d => d.value),
+                            borderColor: '#e74c3c',
+                            backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                            tension: 0.4
+                        }, {
+                            label: 'Vulnerabilidades Encontradas',
+                            data: this.historicalData.vulnerabilities.map(d => d.value),
+                            borderColor: '#f39c12',
+                            backgroundColor: 'rgba(243, 156, 18, 0.1)',
+                            tension: 0.4
+                        }, {
+                            label: 'Incidentes Reportados',
+                            data: this.historicalData.incidents.map(d => d.value),
+                            borderColor: '#3498db',
+                            backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                labels: { color: '#fff' }
+                            }
+                        },
+                        scales: {
+                            x: { 
+                                ticks: { color: '#fff' },
+                                grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                            },
+                            y: { 
+                                ticks: { color: '#fff' },
+                                grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                            }
+                        }
+                    }
+                });
+            }
+
+            createRiskDistributionChart() {
+                const ctx = document.getElementById('riskDistChart');
+                if (this.charts.riskDist) {
+                    this.charts.riskDist.destroy();
+                }
+
+                const riskLevels = [1, 2, 3, 4, 5].map(level => 
+                    this.riskData.filter(risk => risk.level === level).length
+                );
+
+                this.charts.riskDist = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Nivel 1', 'Nivel 2', 'Nivel 3', 'Nivel 4', 'Nivel 5'],
+                        datasets: [{
+                            data: riskLevels,
+                            backgroundColor: ['#2ecc71', '#f1c40f', '#e67e22', '#e74c3c', '#8e44ad']
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                labels: { color: '#fff' }
+                            }
+                        }
+                    }
+                });
+            }
+
+            createThreatTypesChart() {
+                const ctx = document.getElementById('threatTypesChart');
+                if (this.charts.threatTypes) {
+                    this.charts.threatTypes.destroy();
+                }
+
+                const threatCategories = {
+                    'Software Malicioso': 0, 'Ataques de Red': 0, 'Ingeniería Social': 0, 'Filtración de Datos': 0, 'Otros': 0
+                };
+
+                this.riskData.forEach(risk => {
+                    if (['Malware', 'Ransomware', 'Troyano', 'Spyware', 'Rootkit'].includes(risk.type)) {
+                        threatCategories['Software Malicioso']++;
+                    } else if (['DDoS', 'Ataque MITM', 'Botnet', 'Ataque IoT'].includes(risk.type)) {
+                        threatCategories['Ataques de Red']++;
+                    } else if (['Phishing', 'Ingeniería Social', 'Amenaza Interna'].includes(risk.type)) {
+                        threatCategories['Ingeniería Social']++;
+                    } else if (['Filtración de Datos', 'Inyección SQL', 'XSS'].includes(risk.type)) {
+                        threatCategories['Filtración de Datos']++;
+                    } else {
+                        threatCategories['Otros']++;
+                    }
+                });
+
+                this.charts.threatTypes = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: Object.keys(threatCategories),
+                        datasets: [{
+                            label: 'Cantidad de Amenazas Detectadas',
+                            data: Object.values(threatCategories),
+                            backgroundColor: ['#e74c3c', '#3498db', '#f39c12', '#2ecc71', '#9b59b6']
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                labels: { color: '#fff' }
+                            }
+                        },
+                        scales: {
+                            x: { 
+                                ticks: { color: '#fff' },
+                                grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                            },
+                            y: { 
+                                ticks: { color: '#fff' },
+                                grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                            }
+                        }
+                    }
+                });
+            }
+
+            createNetworkChart() {
+                const ctx = document.getElementById('networkChart');
+                if (this.charts.network) {
+                    this.charts.network.destroy();
+                }
+
+                const hours = Array.from({length: 24}, (_, i) => `${i}:00`);
+                const trafficData = hours.map(() => Math.floor(Math.random() * 100));
+
+                this.charts.network = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: hours,
+                        datasets: [{
+                            label: 'Tráfico de Red (%)',
+                            data: trafficData,
+                            borderColor: '#4ecdc4',
+                            backgroundColor: 'rgba(78, 205, 196, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                labels: { color: '#fff' }
+                            }
+                        },
+                        scales: {
+                            x: { 
+                                ticks: { color: '#fff' },
+                                grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                            },
+                            y: { 
+                                ticks: { color: '#fff' },
+                                grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                            }
+                        }
+                    }
+                });
+            }
+
+            generateVulnerabilityAnalysis() {
+                const container = document.getElementById('vulnScanner');
+                const categories = [
+                    { name: 'Sistemas Operativos', critical: 3, high: 8, medium: 15, low: 22 },
+                    { name: 'Aplicaciones Web', critical: 5, high: 12, medium: 18, low: 30 },
+                    { name: 'Bases de Datos', critical: 2, high: 6, medium: 10, low: 15 },
+                    { name: 'Servicios de Red', critical: 1, high: 4, medium: 8, low: 12 },
+                    { name: 'Dispositivos IoT', critical: 7, high: 15, medium: 25, low: 40 },
+                    { name: 'Infraestructura Cloud', critical: 4, high: 9, medium: 14, low: 20 }
+                ];
+
+                container.innerHTML = '';
+                categories.forEach(cat => {
+                    const total = cat.critical + cat.high + cat.medium + cat.low;
+                    const criticalPercentage = (cat.critical / total) * 100;
+                    
+                    const element = document.createElement('div');
+                    element.className = 'vuln-category';
+                    element.innerHTML = `
+                        <h4>${cat.name}</h4>
+                        <div style="color: #e74c3c; font-size: 1.5em; font-weight: bold;">${cat.critical}</div>
+                        <div style="font-size: 0.9em; margin-bottom: 10px;">Vulnerabilidades Críticas</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${criticalPercentage}%; background: linear-gradient(90deg, #e74c3c, #c0392b);"></div>
+                        </div>
+                        <div style="font-size: 0.8em; opacity: 0.8;">
+                            Alto: ${cat.high} | Medio: ${cat.medium} | Bajo: ${cat.low}
+                        </div>
+                    `;
+                    container.appendChild(element);
+                });
+            }
+
+            generateThreatTimeline() {
+                const timeline = document.getElementById('threatTimeline');
+                const events = [
+                    { time: '14:32', event: 'Detección de malware en punto-final-047', type: 'critical' },
+                    { time: '14:15', event: 'Intento de acceso no autorizado bloqueado exitosamente', type: 'warning' },
+                    { time: '13:58', event: 'Actualización de firmas de antivirus completada', type: 'info' },
+                    { time: '13:45', event: 'Tráfico sospechoso detectado desde IP 192.168.1.245', type: 'warning' },
+                    { time: '13:22', event: 'Respaldo de seguridad completado correctamente', type: 'info' },
+                    { time: '13:10', event: 'Detección de comunicación con servidor C&C', type: 'critical' },
+                    { time: '12:55', event: 'Escaneo de vulnerabilidades iniciado automáticamente', type: 'info' },
+                    { time: '12:40', event: 'Configuración de cortafuegos actualizada', type: 'info' }
+                ];
+
+                timeline.innerHTML = '';
+                events.forEach(event => {
+                    const item = document.createElement('div');
+                    item.className = 'timeline-item';
+                    item.innerHTML = `
+                        <div class="timeline-dot" style="background: ${
+                            event.type === 'critical' ? '#e74c3c' : 
+                            event.type === 'warning' ? '#f39c12' : '#3498db'
+                        }"></div>
+                        <div class="timeline-content">
+                            <div style="font-weight: bold; margin-bottom: 5px;">${event.time}</div>
+                            <div>${event.event}</div>
+                        </div>
+                    `;
+                    timeline.appendChild(item);
+                });
+            }
+
+            generateExecutiveSummary() {
+                const container = document.getElementById('executiveSummary');
+                const criticalRisks = this.riskData.filter(risk => risk.level >= 4).length;
+                const averageHeat = this.heatData.reduce((a, b) => a + b, 0) / this.heatData.length;
+                const compromisedNodes = document.querySelectorAll('.network-node.compromised').length;
+
+                container.innerHTML = `
+                    <div style="background: rgba(0, 0, 0, 0.2); padding: 20px; border-radius: 10px; margin: 15px 0;">
+                        <h4 style="color: #4ecdc4; margin-bottom: 15px;">🎯 Resumen de Estado Actual</h4>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                            <div style="text-align: center;">
+                                <div style="font-size: 2em; font-weight: bold; color: ${criticalRisks > 5 ? '#e74c3c' : '#2ecc71'};">${criticalRisks}</div>
+                                <div style="font-size: 0.9em;">Riesgos Críticos</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 2em; font-weight: bold; color: ${averageHeat > 60 ? '#e74c3c' : '#2ecc71'};">${averageHeat.toFixed(1)}%</div>
+                                <div style="font-size: 0.9em;">Intensidad Promedio</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 2em; font-weight: bold; color: ${compromisedNodes > 0 ? '#e74c3c' : '#2ecc71'};">${compromisedNodes}</div>
+                                <div style="font-size: 0.9em;">Nodos Comprometidos</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 2em; font-weight: bold; color: #3498db;">${this.uptime}h</div>
+                                <div style="font-size: 0.9em;">Tiempo de Actividad</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="background: rgba(0, 0, 0, 0.2); padding: 20px; border-radius: 10px; margin: 15px 0;">
+                        <h4 style="color: #f39c12; margin-bottom: 15px;">⚠️ Recomendaciones Prioritarias</h4>
+                        <ul style="list-style: none; padding: 0;">
+                            ${criticalRisks > 5 ? '<li style="margin: 8px 0; color: #e74c3c;">🔥 Implementar medidas de mitigación inmediatas para riesgos críticos</li>' : ''}
+                            ${averageHeat > 70 ? '<li style="margin: 8px 0; color: #e74c3c;">🌡️ Investigar la alta actividad del sistema</li>' : ''}
+                            ${compromisedNodes > 0 ? '<li style="margin: 8px 0; color: #e74c3c;">🔒 Aislar y remediar nodos comprometidos</li>' : ''}
+                            <li style="margin: 8px 0; color: #3498db;">📊 Continuar monitoreo continuo de amenazas</li>
+                            <li style="margin: 8px 0; color: #3498db;">🔄 Actualizar políticas de seguridad según tendencias</li>
+                            <li style="margin: 8px 0; color: #2ecc71;">✅ Mantener respaldos de seguridad actualizados</li>
+                        </ul>
+                    </div>
+                    
+                    <div style="background: rgba(0, 0, 0, 0.2); padding: 20px; border-radius: 10px; margin: 15px 0;">
+                        <h4 style="color: #9b59b6; margin-bottom: 15px;">📈 Tendencias y Análisis</h4>
+                        <p style="margin: 10px 0; line-height: 1.6;">
+                            El análisis de las últimas ${this.historicalData.threats.length} actualizaciones muestra una 
+                            ${this.historicalData.threats.slice(-5).reduce((a,b) => a + b.value, 0) > 
+                              this.historicalData.threats.slice(-10, -5).reduce((a,b) => a + b.value, 0) ? 
+                              'tendencia al alza' : 'tendencia a la baja'} en la detección de amenazas.
+                        </p>
+                        <p style="margin: 10px 0; line-height: 1.6;">
+                            Los sectores más críticos identificados son: <strong>Aplicaciones Web</strong> y 
+                            <strong>Dispositivos IoT</strong>, requiriendo atención especializada.
+                        </p>
+                        <p style="margin: 10px 0; line-height: 1.6;">
+                            El índice de seguridad general del sistema se mantiene en un nivel 
+                            <strong>${parseInt(document.getElementById('securityScore').textContent) > 75 ? 'ALTO' : 
+                                     parseInt(document.getElementById('securityScore').textContent) > 50 ? 'MEDIO' : 'BAJO'}</strong>.
+                        </p>
+                    </div>
+                `;
+            }
+
+            closeReport() {
+                const modal = document.getElementById('reportModal');
+                modal.classList.remove('show');
+                
+                // Destruir gráficos para liberar memoria
+                Object.values(this.charts).forEach(chart => {
+                    if (chart) chart.destroy();
+                });
+                this.charts = {};
+            }
+
+            exportData() {
+                const reportData = {
+                    marcaTiempo: new Date().toISOString(),
+                    matrizRiesgos: this.riskData,
+                    datosMapaCalor: this.heatData,
+                    nodosRed: this.networkNodes,
+                    datosHistoricos: this.historicalData,
+                    estadisticasActuales: {
+                        amenazasTotales: document.getElementById('totalThreats').textContent,
+                        riesgosCriticos: document.getElementById('criticalRisks').textContent,
+                        vulnerabilidades: document.getElementById('vulnerabilities').textContent,
+                        incidentes: document.getElementById('incidents').textContent,
+                        cargaSistema: document.getElementById('systemLoad').textContent,
+                        traficoRed: document.getElementById('networkTraffic').textContent,
+                        puntuacionSeguridad: document.getElementById('securityScore').textContent,
+                        tiempoActividad: document.getElementById('uptime').textContent
+                    },
+                    eventosSeguridad: Array.from(document.querySelectorAll('.event-item')).map(el => ({
+                        tipo: el.className.split(' ')[1],
+                        mensaje: el.querySelector('span').textContent,
+                        marcaTiempo: el.querySelector('small').textContent
+                    }))
+                };
+
+                const dataStr = JSON.stringify(reportData, null, 2);
+                const dataBlob = new Blob([dataStr], {type: 'application/json'});
+                
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(dataBlob);
+                link.download = `reporte-seguridad-${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                this.showAlert('📁 Datos exportados exitosamente en formato JSON');
+            }
+        }
+
+        // Initialize the system when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new AdvancedRiskMonitoringSystem();
+        });
+    </script>
+</body>
+</html>
